@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arc Calculator</title>
+  <style>
+    :root { --page:#eef1f6; --panel:#f8fafc; --screen:#18252d; --ink:#1f2e38; --muted:#819099; --key:#e7edf0; --operator:#cde6dc; --accent:#e87b59; }
+    * { box-sizing:border-box; }
+    body { min-height:100vh; margin:0; display:grid; place-items:center; padding:24px; color:var(--ink); background:radial-gradient(circle at 15% 15%, #d7eae7 0 12%, transparent 33%), radial-gradient(circle at 88% 86%, #f3d7c9 0 11%, transparent 32%), var(--page); font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .calculator { width:min(100%, 375px); padding:18px; border:1px solid rgba(255,255,255,.82); border-radius:28px; background:rgba(248,250,252,.78); box-shadow:0 24px 60px rgba(34,52,61,.2), inset 0 1px 1px #fff; backdrop-filter:blur(12px); }
+    .topline { display:flex; justify-content:space-between; align-items:center; padding:4px 6px 17px; font-size:12px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); }
+    .status { display:flex; align-items:center; gap:6px; } .status i { width:7px; height:7px; border-radius:50%; background:#78b79d; }
+    .display { min-height:135px; display:flex; flex-direction:column; justify-content:flex-end; align-items:flex-end; padding:18px 17px; border-radius:18px; color:#fff; background:var(--screen); box-shadow:inset 0 -12px 25px rgba(0,0,0,.18); overflow:hidden; }
+    .expression { min-height:22px; max-width:100%; color:#b5c3c6; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .result { max-width:100%; margin-top:5px; font-size:clamp(35px, 12vw, 53px); font-weight:500; line-height:1.15; letter-spacing:-.06em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .keys { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:16px; }
+    button { min-height:60px; cursor:pointer; border:0; border-radius:15px; color:var(--ink); background:var(--key); box-shadow:0 3px 0 #cad4d8, 0 7px 13px rgba(45,65,74,.09); font:600 18px/1 inherit; transition:transform .12s ease, box-shadow .12s ease, filter .2s ease; }
+    button:hover { filter:brightness(.98); transform:translateY(-2px); } button:active { transform:translateY(2px); box-shadow:0 1px 0 #cad4d8; }
+    .function { color:#b65842; background:#f8e0d8; box-shadow:0 3px 0 #e5c6bb, 0 7px 13px rgba(45,65,74,.08); } .operator { background:var(--operator); box-shadow:0 3px 0 #b2d2c4, 0 7px 13px rgba(45,65,74,.08); } .equals { color:#fff; background:var(--accent); box-shadow:0 3px 0 #c76548, 0 7px 13px rgba(45,65,74,.12); } .zero { grid-column:span 2; }
+    .hint { margin:18px 0 2px; color:var(--muted); text-align:center; font-size:11px; } kbd { padding:2px 5px; border-radius:4px; background:#e4eaed; font:inherit; }
+  </style>
+</head>
+<body>
+  <main class="calculator" aria-label="Calculator">
+    <div class="topline"><span>arc calculator</span><span class="status"><i></i> ready</span></div>
+    <section class="display" aria-live="polite">
+      <div class="expression" id="expression">Ready to calculate</div>
+      <div class="result" id="result">0</div>
+    </section>
+    <section class="keys" aria-label="Calculator buttons">
+      <button class="function" data-action="clear">AC</button><button class="function" data-action="delete" aria-label="Delete last character">⌫</button><button class="operator" data-value="%">%</button><button class="operator" data-value="÷">÷</button>
+      <button data-value="7">7</button><button data-value="8">8</button><button data-value="9">9</button><button class="operator" data-value="×">×</button>
+      <button data-value="4">4</button><button data-value="5">5</button><button data-value="6">6</button><button class="operator" data-value="−">−</button>
+      <button data-value="1">1</button><button data-value="2">2</button><button data-value="3">3</button><button class="operator" data-value="+">+</button>
+      <button class="zero" data-value="0">0</button><button data-value=".">.</button><button class="equals" data-action="equals">=</button>
+    </section>
+    <p class="hint">Use your keyboard: <kbd>Enter</kbd> to calculate · <kbd>Esc</kbd> to clear</p>
+  </main>
+  <script>
+    const expressionEl = document.getElementById('expression');
+    const resultEl = document.getElementById('result');
+    let expression = '';
+    let justCalculated = false;
+    const operators = ['+', '−', '×', '÷', '%'];
+
+    function pretty(value) { return value.replaceAll('*', '×').replaceAll('/', '÷').replaceAll('-', '−'); }
+    function update() {
+      expressionEl.textContent = expression ? pretty(expression) : 'Ready to calculate';
+      if (!expression || /[+\-*/%]$/.test(expression)) { resultEl.textContent = expression ? '—' : '0'; return; }
+      try { const value = Function(`"use strict"; return (${expression})`)(); resultEl.textContent = Number.isFinite(value) ? format(value) : 'Error'; } catch { resultEl.textContent = '—'; }
+    }
+    function format(value) { return Number.isInteger(value) ? value.toString() : parseFloat(value.toFixed(8)).toString(); }
+    function add(value) {
+      const normalized = value === '×' ? '*' : value === '÷' ? '/' : value === '−' ? '-' : value;
+      const last = expression.at(-1);
+      if (operators.includes(value)) {
+        if (!expression && value !== '−') return;
+        if (/[+\-*/%]/.test(last)) expression = expression.slice(0, -1) + normalized;
+        else expression += normalized;
+      } else if (value === '.') {
+        const currentNumber = expression.split(/[+\-*/%]/).at(-1);
+        if (!currentNumber.includes('.')) expression += value;
+      } else { if (justCalculated) expression = ''; expression += value; }
+      justCalculated = false; update();
+    }
+    function calculate() { if (!expression || /[+\-*/%]$/.test(expression)) return; try { const value = Function(`"use strict"; return (${expression})`)(); if (!Number.isFinite(value)) throw Error(); const answer = format(value); expressionEl.textContent = `${pretty(expression)} =`; resultEl.textContent = answer; expression = answer; justCalculated = true; } catch { resultEl.textContent = 'Error'; justCalculated = true; } }
+    document.querySelectorAll('button').forEach(button => button.addEventListener('click', () => { const { value, action } = button.dataset; if (action === 'clear') { expression = ''; justCalculated = false; update(); } else if (action === 'delete') { expression = expression.slice(0, -1); justCalculated = false; update(); } else if (action === 'equals') calculate(); else add(value); }));
+    document.addEventListener('keydown', event => { const key = event.key; if (/^[0-9.]$/.test(key)) add(key); else if (['+', '-', '*', '/', '%'].includes(key)) add(key === '*' ? '×' : key === '/' ? '÷' : key === '-' ? '−' : key); else if (key === 'Enter' || key === '=') { event.preventDefault(); calculate(); } else if (key === 'Backspace') { expression = expression.slice(0, -1); update(); } else if (key === 'Escape') { expression = ''; justCalculated = false; update(); } });
+  </script>
+</body>
+</html>
